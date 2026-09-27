@@ -1,0 +1,102 @@
+# Clarity Calculator Backend
+
+Python HTTP API for a front-end/back-end separated calculator. The backend validates and evaluates every expression, commits successful results to a database, and serves searchable, paginated history.
+
+配套前端：[calculator-frontend](https://github.com/HX-Jan/calculator-frontend)。本项目由 AI 辅助实现与测试，使用者应理解代码并按课程要求声明辅助范围。
+
+## Environment and installation
+
+- Python 3.13; SQLite is built into Python. PostgreSQL is supported through psycopg.
+- Dependencies are pinned in `requirements.txt`; `requirements.in` lists direct dependencies.
+- Windows PowerShell (run from this repository):
+
+```powershell
+python -m venv .venv
+.\.venv\Scripts\python.exe -m pip install -r requirements.txt
+Copy-Item .env.example .env
+.\.venv\Scripts\python.exe -m uvicorn app.main:app --host 127.0.0.1 --port 8000
+```
+
+macOS/Linux: replace `.venv\Scripts\python.exe` with `.venv/bin/python` and use `cp .env.example .env`.
+
+API documentation: http://127.0.0.1:8000/docs. Health: http://127.0.0.1:8000/api/health.
+
+## Configuration and database initialization
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `DATABASE_URL` | `sqlite:///./calculator.db` | SQLite file relative to the server working directory, or PostgreSQL URL |
+| `ALLOWED_ORIGINS` | `http://localhost:5173,http://127.0.0.1:5173` | Comma-separated exact frontend origins without trailing slash |
+
+The application creates the `calculation_history` table on startup. Restarting with the same database URL preserves records. Deleting or moving the SQLite file changes the data source. `.env` and database files are excluded from Git.
+
+Production: use a PostgreSQL connection string with TLS, such as `postgresql://USER:PASSWORD@HOST/DB?sslmode=require`. The application converts this to the psycopg SQLAlchemy driver. Set secrets only in the hosting platform, never in Git. Local and hosted databases are independent; local demonstration rows are not uploaded.
+
+## API contract
+
+All successful responses: `{"success":true,"data":...}`. All handled validation/calculation/database errors: `{"success":false,"error":{"code":"...","message":"..."}}`.
+
+| Method | Path | Input | Response |
+|---|---|---|---|
+| POST | `/api/calculate` | `{"expression":"(1+2)*3"}` | 201: id, expression, result, created_at, steps |
+| GET | `/api/history` | `q`, `page` ≥ 1, `page_size` 1–100 (default 20) | 200: items, total, page, page_size |
+| DELETE | `/api/history/{id}` | Positive integer id | 200: deleted_id; 404 if absent |
+| GET | `/api/health` | None | 200 if a database query succeeds |
+
+```json
+{
+  "success": true,
+  "data": {
+    "id": 1,
+    "expression": "(1+2)*3",
+    "result": "9",
+    "created_at": "2026-09-27T01:00:00+00:00",
+    "steps": [
+      {"operation": "1 + 2", "result": "3"},
+      {"operation": "3 * 3", "result": "9"}
+    ]
+  }
+}
+```
+
+This is an illustrative response, not a claim about the current database. Results are decimal **strings** to preserve precision in JavaScript. History does not persist the step list; recalculating a reused expression produces fresh steps and a new record.
+
+## Calculation rules
+
+Grammar: `expression → term ((+|-) term)*`; `term → unary ((*|/) unary)*`; `unary → (+|-) unary | number | '(' expression ')'`.
+
+- Supports decimals, parentheses, unary signs, spaces, `×`/`÷` aliases. Multiplication must be explicit: `2*(3+4)`.
+- No scientific functions, exponent notation, power operator, identifiers, or arbitrary code execution.
+- Decimal precision: 28 significant digits, round-half-even. `1/3` is rounded, not an exact rational number. This is not arbitrary-precision arithmetic.
+- Maximum expression length 500, nesting 32, individual number 28 significant digits, result/intermediate magnitude ≤ `1e100`.
+- Empty/invalid expressions and zero division return 400 and do not create history. Failed database commits return 503, not a successful calculation response.
+- UTC timestamps; frontend displays the visitor's local time. Search matches literal substrings in expression or result. Ordering: timestamp descending, then id descending.
+
+## Structure and design
+
+```text
+app/main.py       HTTP validation, CORS, exception handlers and startup
+app/parser.py     Tokenizer and recursive-descent Decimal evaluator
+app/service.py    Calculate/save, query and delete use cases
+app/database.py   SQLAlchemy model, engine and sessions
+app/errors.py     Client-safe calculation errors
+tests/           Parser, persistence and API regression tests
+```
+
+No account authentication is implemented. All visitors share the demonstration history and may delete records. CORS is not an authentication mechanism. Do not store sensitive input. This is a coursework demo, not a multi-tenant production service.
+
+## Tests
+
+```powershell
+.\.venv\Scripts\python.exe -m pytest --cov=app --cov-report=term-missing -q
+.\.venv\Scripts\ruff.exe check app tests
+.\.venv\Scripts\ruff.exe format --check app tests
+```
+
+Tests use temporary SQLite databases. GitHub Actions also runs the persistence contract against a PostgreSQL service. No user database is cleared by tests.
+
+## Manual deployment
+
+Render: Python 3.13, build `pip install -r requirements.txt`, start `uvicorn app.main:app --host 0.0.0.0 --port $PORT`, health path `/api/health`. Set `DATABASE_URL` to Neon PostgreSQL and `ALLOWED_ORIGINS` to your frontend HTTPS origin. Do not use SQLite on Render's free ephemeral filesystem. The free service can sleep; allow for cold starts. No public deployment is included in this repository upload.
+
+See [Render FastAPI guide](https://render.com/docs/deploy-fastapi), [free service limitations](https://render.com/docs/free), and [code standards](codestyle.md).

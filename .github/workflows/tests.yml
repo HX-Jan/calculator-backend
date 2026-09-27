@@ -1,0 +1,31 @@
+name: Backend checks
+on: [push, pull_request, workflow_dispatch]
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: calculator_test
+          POSTGRES_PASSWORD: temporary_ci_only
+          POSTGRES_DB: calculator_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U calculator_test"
+          --health-interval 10s --health-timeout 5s --health-retries 5
+    env:
+      TEST_POSTGRES_URL: postgresql://calculator_test:temporary_ci_only@localhost:5432/calculator_test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+          cache: pip
+      - run: pip install -r requirements.txt
+      - run: ruff check app tests
+      - run: ruff format --check app tests
+      - run: python -m pytest --cov=app --cov-report=term-missing -q
