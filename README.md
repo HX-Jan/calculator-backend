@@ -38,7 +38,7 @@ All successful responses: `{"success":true,"data":...}`. All handled validation/
 
 | Method | Path | Input | Response |
 |---|---|---|---|
-| POST | `/api/calculate` | `{"expression":"(1+2)*3"}` | 201: id, expression, result, created_at, steps |
+| POST | `/api/calculate` | `{"expression":"(1+2)*3"}` | 201: id, expression, result, angle_mode, created_at, steps |
 | GET | `/api/history` | `q`, `page` ≥ 1, `page_size` 1–100 (default 20) | 200: items, total, page, page_size |
 | DELETE | `/api/history/{id}` | Positive integer id | 200: deleted_id; 404 if absent |
 | GET | `/api/health` | None | 200 if a database query succeeds |
@@ -50,6 +50,7 @@ All successful responses: `{"success":true,"data":...}`. All handled validation/
     "id": 1,
     "expression": "(1+2)*3",
     "result": "9",
+    "angle_mode": "deg",
     "created_at": "2026-09-27T01:00:00+00:00",
     "steps": [
       {"operation": "1 + 2", "result": "3"},
@@ -63,10 +64,10 @@ This is an illustrative response, not a claim about the current database. Result
 
 ## Calculation rules
 
-Grammar: `expression → term ((+|-) term)*`; `term → unary ((*|/) unary)*`; `unary → (+|-) unary | number | '(' expression ')'`.
+Grammar: `expression → term ((+|-) term)*`; `term → unary ((*|/) unary)*`; `unary → (+|-) unary | power`; `power → primary (!)* [^ unary]`; primary includes numbers, constants, parenthesized expressions and function calls.
 
 - Supports decimals, parentheses, unary signs, spaces, `×`/`÷` aliases. Multiplication must be explicit: `2*(3+4)`.
-- No scientific functions, exponent notation, power operator, identifiers, or arbitrary code execution.
+- Supports sqrt, sin, cos, tan, ln, log, pi/π, e, power `^` and factorial `!`. Only whitelisted functions are accepted; no arbitrary code execution or exponent notation.
 - Decimal precision: 28 significant digits, round-half-even. `1/3` is rounded, not an exact rational number. This is not arbitrary-precision arithmetic.
 - Maximum expression length 500, nesting 32, individual number 28 significant digits, result/intermediate magnitude ≤ `1e100`.
 - Empty/invalid expressions and zero division return 400 and do not create history. Failed database commits return 503, not a successful calculation response.
@@ -100,3 +101,14 @@ Tests use temporary SQLite databases. GitHub Actions also runs the persistence c
 Render: Python 3.13, build `pip install -r requirements.txt`, start `uvicorn app.main:app --host 0.0.0.0 --port $PORT`, health path `/api/health`. Set `DATABASE_URL` to Neon PostgreSQL and `ALLOWED_ORIGINS` to your frontend HTTPS origin. Do not use SQLite on Render's free ephemeral filesystem. The free service can sleep; allow for cold starts. No public deployment is included in this repository upload.
 
 See [Render FastAPI guide](https://render.com/docs/deploy-fastapi), [free service limitations](https://render.com/docs/free), and [code standards](codestyle.md).
+
+
+## Scientific mode and compatibility
+
+`POST /api/calculate` accepts `{"expression":"sin(pi/2)","angle_mode":"rad"}`. The optional angle_mode is `deg` (default) or `rad`; invalid values return 400. Calculation responses and history entries include this unit. No UI mode field is needed: both keyboards use the same evaluator.
+
+Power is right associative: `2^3^2=512`, `-2^2=-4`, `2^-3=0.125`. Factorial binds before power. Multiplication must remain explicit. Only real numbers are supported. Factorial accepts integers 0–69; negative square roots, nonpositive logarithms, undefined tangent and invalid real powers return errors without saving history. The absolute exponent is limited to 10000, trigonometric arguments to 10^12, and nonzero results below 10^-1000 are rejected to bound display length. The existing upper result bound remains 10^100.
+
+Decimal arithmetic, roots, logarithms and powers use 28-digit precision. Constants carry extra guard digits. Trigonometry uses Python's standard math library and is rounded to 15 significant digits; it is approximate, with reduced accuracy near singularities and for large radian inputs. Exact degree quadrants are normalized; tiny results are not generally rounded to zero. Steps include DEG/RAD for trigonometry.
+
+Startup performs an additive, repeatable SQLite/PostgreSQL upgrade, adding angle_mode with default `deg` to old history. Back up the database before a deployment upgrade. Existing IDs, expressions, results and timestamps are retained. Deploy the backend before the updated frontend so the optional request field is accepted.

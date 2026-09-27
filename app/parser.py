@@ -1,11 +1,12 @@
 """A bounded recursive-descent arithmetic parser; never executes Python code."""
 
+import math
 import re
 from decimal import Decimal, DecimalException, localcontext
 
 from app.errors import CalculatorError
 
-TOKEN = re.compile(r"(?:[0-9]+(?:\.[0-9]*)?|\.[0-9]+)|[()+*/-]")
+TOKEN = re.compile(r"(?:[0-9]+(?:\.[0-9]*)?|\.[0-9]+)|[a-z]+|[()^!+*/-]")
 MAX_LENGTH = 500
 MAX_DEPTH = 32
 
@@ -18,6 +19,8 @@ def format_decimal(value: Decimal) -> str:
         )
     if value == 0:
         return "0"
+    if value.adjusted() < -1000:
+        raise CalculatorError("NUMERIC_ERROR", "结果过小，超出显示范围。")
     text = format(value, "f")
     return text.rstrip("0").rstrip(".") if "." in text else text
 
@@ -25,10 +28,13 @@ def format_decimal(value: Decimal) -> str:
 class Parser:
     """expression → term → unary → primary implements mathematical precedence."""
 
-    def __init__(self, expression: str):
+    def __init__(self, expression: str, angle_mode: str = "deg"):
+        self.angle_mode = angle_mode
         if len(expression) > MAX_LENGTH:
             raise CalculatorError("EXPRESSION_TOO_LONG", "表达式不能超过 500 个字符。")
-        self.expression = expression.strip().replace("×", "*").replace("÷", "/")
+        self.expression = (
+            expression.strip().replace("×", "*").replace("÷", "/").replace("π", "pi")
+        )
         self.tokens: list[str] = []
         self.position = 0
         self.steps: list[dict[str, str]] = []
@@ -87,6 +93,84 @@ class Parser:
                 }
             )
             return result
+        return self.power(depth)
+
+    def power(self, depth: int) -> Decimal:
+        value = self.primary(depth)
+        while self.peek() == "!":
+            self.take()
+            if value != value.to_integral_value() or not 0 <= value <= 69:
+                raise CalculatorError("DOMAIN_ERROR", "阶乘仅支持 0–69 的整数。")
+            value = self.record(
+                f"{format_decimal(value)}!", Decimal(math.factorial(int(value)))
+            )
+        if self.peek() == "^":
+            self.take()
+            right = self.unary(depth + 1)
+            if (value == 0 and right <= 0) or (
+                value < 0 and right != right.to_integral_value()
+            ):
+                raise CalculatorError("DOMAIN_ERROR", "乘方在实数范围内无定义。")
+            if abs(right) > 10000:
+                raise CalculatorError("NUMERIC_ERROR", "指数绝对值不能超过 10000。")
+            value = self.record(
+                f"{format_decimal(value)} ^ {format_decimal(right)}", value**right
+            )
+        return value
+
+    def record(self, operation: str, value: Decimal) -> Decimal:
+        self.steps.append({"operation": operation, "result": format_decimal(value)})
+        return value
+
+    def primary(self, depth: int) -> Decimal:
+        name = self.peek()
+        if name in ("pi", "e"):
+            self.take()
+            with localcontext() as constants_context:
+                constants_context.prec = 40
+                return (
+                    Decimal("3.141592653589793238462643383279502884197")
+                    if name == "pi"
+                    else Decimal(1).exp()
+                )
+        if name in ("sqrt", "sin", "cos", "tan", "ln", "log"):
+            self.take()
+            if self.take() != "(":
+                raise CalculatorError("INVALID_EXPRESSION", "函数需要括号。")
+            value = self.expression_value(depth + 1)
+            if self.take() != ")":
+                raise CalculatorError("INVALID_EXPRESSION", "括号不匹配。")
+            if name == "sqrt":
+                if value < 0:
+                    raise CalculatorError("DOMAIN_ERROR", "负数不能开平方。")
+                result = value.sqrt()
+            elif name in ("ln", "log"):
+                if value <= 0:
+                    raise CalculatorError("DOMAIN_ERROR", "对数的参数必须大于零。")
+                result = value.ln() if name == "ln" else value.log10()
+            else:
+                if abs(value) > Decimal("1e12"):
+                    raise CalculatorError(
+                        "NUMERIC_ERROR", "三角函数参数绝对值不能超过 10¹²。"
+                    )
+                reduced = value % 360 if self.angle_mode == "deg" else value
+                angle = (
+                    math.radians(float(reduced))
+                    if self.angle_mode == "deg"
+                    else float(value)
+                )
+                if name == "tan" and abs(math.cos(angle)) < 1e-15:
+                    raise CalculatorError("DOMAIN_ERROR", "此角度的正切无定义。")
+                number = {"sin": math.sin, "cos": math.cos, "tan": math.tan}[name](
+                    angle
+                )
+                if self.angle_mode == "deg" and reduced % 90 == 0:
+                    number = round(number)
+                result = Decimal(format(number, ".15g"))
+            unit = (
+                f" [{self.angle_mode.upper()}]" if name in ("sin", "cos", "tan") else ""
+            )
+            return self.record(f"{name}({format_decimal(value)}){unit}", result)
         if self.peek() == "(":
             self.take()
             value = self.expression_value(depth + 1)
@@ -94,7 +178,7 @@ class Parser:
                 raise CalculatorError("INVALID_EXPRESSION", "括号不匹配。")
             return value
         token = self.take()
-        if token in ("*", "/", ")"):
+        if not re.fullmatch(r"(?:[0-9]+(?:\.[0-9]*)?|\.[0-9]+)", token):
             raise CalculatorError("INVALID_EXPRESSION", "此处需要数字或左括号。")
         if len(token.replace(".", "").lstrip("0")) > 28:
             raise CalculatorError("NUMBER_TOO_LONG", "单个数字最多支持 28 位有效数字。")
@@ -122,8 +206,10 @@ class Parser:
         return result
 
 
-def calculate(expression: str) -> tuple[str, str, list[dict[str, str]]]:
-    parser = Parser(expression)
+def calculate(
+    expression: str, angle_mode: str = "deg"
+) -> tuple[str, str, list[dict[str, str]]]:
+    parser = Parser(expression, angle_mode)
     try:
         with localcontext() as context:
             context.prec = 28

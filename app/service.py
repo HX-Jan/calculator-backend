@@ -8,9 +8,11 @@ from app.errors import CalculatorError
 from app.parser import calculate
 
 
-def calculate_and_save(session: Session, expression: str) -> dict:
-    normalized, result, steps = calculate(expression)
-    record = History(expression=normalized, result=result)
+def calculate_and_save(
+    session: Session, expression: str, angle_mode: str = "deg"
+) -> dict:
+    normalized, result, steps = calculate(expression, angle_mode)
+    record = History(expression=normalized, result=result, angle_mode=angle_mode)
     session.add(record)
     session.commit()
     return {**record.as_dict(), "steps": steps}

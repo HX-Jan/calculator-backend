@@ -3,7 +3,7 @@
 import logging
 import os
 from contextlib import asynccontextmanager
-from typing import Annotated
+from typing import Annotated, Literal
 
 from dotenv import load_dotenv
 from fastapi import Depends, FastAPI, Path, Query
@@ -16,7 +16,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from app import service
-from app.database import Base, connect_database
+from app.database import connect_database, initialize_database
 from app.errors import CalculatorError
 
 load_dotenv()
@@ -26,6 +26,7 @@ logger = logging.getLogger(__name__)
 class CalculationRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
     expression: StrictStr
+    angle_mode: Literal["deg", "rad"] = "deg"
 
 
 def create_app(database_url: str | None = None) -> FastAPI:
@@ -35,7 +36,7 @@ def create_app(database_url: str | None = None) -> FastAPI:
 
     @asynccontextmanager
     async def lifespan(application):
-        Base.metadata.create_all(engine)
+        initialize_database(engine)
         yield
         engine.dispose()
 
@@ -108,7 +109,9 @@ def create_app(database_url: str | None = None) -> FastAPI:
     ):
         return {
             "success": True,
-            "data": service.calculate_and_save(session, body.expression),
+            "data": service.calculate_and_save(
+                session, body.expression, body.angle_mode
+            ),
         }
 
     @application.get("/api/history")

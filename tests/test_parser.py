@@ -69,7 +69,6 @@ def test_valid_expressions(expression, expected):
         "-" * 33 + "1",
         "[1]",
         "1;2",
-        "2^3",
     ],
 )
 def test_invalid_expressions(expression):
