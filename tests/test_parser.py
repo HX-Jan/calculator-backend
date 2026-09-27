@@ -59,7 +59,6 @@ def test_valid_expressions(expression, expected):
         "__import__('os')",
         "NaN",
         "Infinity",
-        "1e3",
         "1/0",
         "0/0",
         "1/(2-2)",

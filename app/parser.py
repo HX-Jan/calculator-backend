@@ -5,8 +5,11 @@ import re
 from decimal import Decimal, DecimalException, localcontext
 
 from app.errors import CalculatorError
+from app.scientific import ARITY, extended
 
-TOKEN = re.compile(r"(?:[0-9]+(?:\.[0-9]*)?|\.[0-9]+)|[a-z]+|[()^!+*/-]")
+TOKEN = re.compile(
+    r"(?:[0-9]+(?:\.[0-9]*)?|\.[0-9]+)(?:[eE][+-]?[0-9]+)?|[a-z]+|[(),%^!+*/-]"
+)
 MAX_LENGTH = 500
 MAX_DEPTH = 32
 
@@ -97,8 +100,11 @@ class Parser:
 
     def power(self, depth: int) -> Decimal:
         value = self.primary(depth)
-        while self.peek() == "!":
-            self.take()
+        while self.peek() in ("!", "%"):
+            operator = self.take()
+            if operator == "%":
+                value = self.record(f"{format_decimal(value)}%", value / 100)
+                continue
             if value != value.to_integral_value() or not 0 <= value <= 69:
                 raise CalculatorError("DOMAIN_ERROR", "阶乘仅支持 0–69 的整数。")
             value = self.record(
@@ -133,6 +139,26 @@ class Parser:
                     if name == "pi"
                     else Decimal(1).exp()
                 )
+        if name in ARITY:
+            self.take()
+            if self.take() != "(":
+                raise CalculatorError("INVALID_EXPRESSION", "函数需要括号。")
+            args = [self.expression_value(depth + 1)]
+            for _ in range(ARITY[name] - 1):
+                if self.take() != ",":
+                    raise CalculatorError("INVALID_EXPRESSION", "参数之间需要逗号。")
+                args.append(self.expression_value(depth + 1))
+            if self.take() != ")":
+                raise CalculatorError("INVALID_EXPRESSION", "函数参数数量或括号错误。")
+            unit = (
+                f" [{self.angle_mode.upper()}]"
+                if name in ("asin", "acos", "atan")
+                else ""
+            )
+            operation = (
+                name + "(" + ", ".join(format_decimal(v) for v in args) + ")" + unit
+            )
+            return self.record(operation, extended(name, args, self.angle_mode))
         if name in ("sqrt", "sin", "cos", "tan", "ln", "log"):
             self.take()
             if self.take() != "(":
@@ -178,11 +204,18 @@ class Parser:
                 raise CalculatorError("INVALID_EXPRESSION", "括号不匹配。")
             return value
         token = self.take()
-        if not re.fullmatch(r"(?:[0-9]+(?:\.[0-9]*)?|\.[0-9]+)", token):
+        if not re.fullmatch(
+            r"(?:[0-9]+(?:\.[0-9]*)?|\.[0-9]+)(?:[eE][+-]?[0-9]+)?", token
+        ):
             raise CalculatorError("INVALID_EXPRESSION", "此处需要数字或左括号。")
-        if len(token.replace(".", "").lstrip("0")) > 28:
+        if (
+            len(re.split("[eE]", token)[0].replace(".", "").lstrip("0").rstrip("0"))
+            > 28
+        ):
             raise CalculatorError("NUMBER_TOO_LONG", "单个数字最多支持 28 位有效数字。")
-        return Decimal(token)
+        value = Decimal(token)
+        format_decimal(value)
+        return value
 
     def apply(self, left: Decimal, operator: str, right: Decimal) -> Decimal:
         if operator == "+":
@@ -218,7 +251,7 @@ def calculate(
                 raise CalculatorError(
                     "INVALID_EXPRESSION", "数字之间需要运算符，请检查括号和小数点。"
                 )
-            return parser.expression, format_decimal(value), parser.steps
+            return parser.expression, format_decimal(+value), parser.steps
     except DecimalException as exc:
         raise CalculatorError(
             "NUMERIC_ERROR", "数值无法计算，请缩小输入范围。"

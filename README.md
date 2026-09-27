@@ -67,7 +67,7 @@ This is an illustrative response, not a claim about the current database. Result
 Grammar: `expression → term ((+|-) term)*`; `term → unary ((*|/) unary)*`; `unary → (+|-) unary | power`; `power → primary (!)* [^ unary]`; primary includes numbers, constants, parenthesized expressions and function calls.
 
 - Supports decimals, parentheses, unary signs, spaces, `×`/`÷` aliases. Multiplication must be explicit: `2*(3+4)`.
-- Supports sqrt, sin, cos, tan, ln, log, pi/π, e, power `^` and factorial `!`. Only whitelisted functions are accepted; no arbitrary code execution or exponent notation.
+- Supports sqrt, sin, cos, tan, ln, log, pi/π, e, power `^` and factorial `!`. Only whitelisted functions are accepted; no arbitrary code execution.
 - Decimal precision: 28 significant digits, round-half-even. `1/3` is rounded, not an exact rational number. This is not arbitrary-precision arithmetic.
 - Maximum expression length 500, nesting 32, individual number 28 significant digits, result/intermediate magnitude ≤ `1e100`.
 - Empty/invalid expressions and zero division return 400 and do not create history. Failed database commits return 503, not a successful calculation response.
@@ -112,3 +112,16 @@ Power is right associative: `2^3^2=512`, `-2^2=-4`, `2^-3=0.125`. Factorial bind
 Decimal arithmetic, roots, logarithms and powers use 28-digit precision. Constants carry extra guard digits. Trigonometry uses Python's standard math library and is rounded to 15 significant digits; it is approximate, with reduced accuracy near singularities and for large radian inputs. Exact degree quadrants are normalized; tiny results are not generally rounded to zero. Steps include DEG/RAD for trigonometry.
 
 Startup performs an additive, repeatable SQLite/PostgreSQL upgrade, adding angle_mode with default `deg` to old history. Back up the database before a deployment upgrade. Existing IDs, expressions, results and timestamps are retained. Deploy the backend before the updated frontend so the optional request field is accepted.
+
+
+## 扩展科学功能
+
+科学键盘使用 2nd 切换两页。新增 asin/acos/atan、sinh/cosh/tanh 及其反函数、abs、exp、cbrt、floor/ceil。反三角函数输出遵循 DEG/RAD；双曲函数及其反函数不使用角度单位。
+
+双参数函数使用逗号分隔：`root(x,n)`（n 次方根）、`logbase(x,b)`（底 b）、`mod(x,y)`（余数符号跟随 x）、`perm(n,r)`、`comb(n,r)`。排列组合仅接受 `0 ≤ r ≤ n ≤ 1000` 的整数，结果仍受范围限制。负数仅支持整数奇次根。
+
+EXP 输入 E，例如 `1.2E-3`；也接受小写 e。常量 e 单独使用，乘法需明确输入。百分号固定表示除以 100，`200+10%` 为 `200.1`，`200*10%` 为 `20`。
+
+Ans 插入上次成功结果；MS 存储当前结果，MR 读取，MC 清除。Ans 和存储仅在当前页面会话保留，AC 不清除存储。所有数值运算仍通过后端。函数键包裹选区；双参数函数包裹选区作为第一个参数，随后填写第二参数并闭合括号。
+
+三角、反三角、双曲及反双曲函数为约 15 位有效数字的浮点近似；根和对数也可能产生舍入。仅支持实数。本次不含矩阵、复数、方程和统计模块。
