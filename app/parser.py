@@ -64,7 +64,13 @@ class Parser:
         self.spans = []
         self.tokens: list[str] = []
         self.position = 0
-        self.steps: list[dict[str, str]] = []
+        self.steps: list[dict] = []
+        self.fragments = []
+        source_offset = 0
+        for char in expression:
+            width = len(char.encode("utf-16-le")) // 2
+            self.fragments.append((source_offset, source_offset + width, char))
+            source_offset += width
         offset = 0
         while offset < len(self.expression):
             if self.expression[offset].isspace():
@@ -121,52 +127,60 @@ class Parser:
         return token
 
     def expression_value(self, depth: int = 0) -> Decimal:
+        expression_start = self.position
         value = self.term(depth)
         while self.peek() in ("+", "-"):
             operator = self.take()
-            value = self.apply(value, operator, self.term(depth))
+            value = self.apply(value, operator, self.term(depth), expression_start)
         return value
 
     def term(self, depth: int) -> Decimal:
+        expression_start = self.position
         value = self.unary(depth)
         while self.peek() in ("*", "/"):
             operator = self.take()
             start = self.position
             right = self.unary(depth)
             try:
-                value = self.apply(value, operator, right)
+                value = self.apply(value, operator, right, expression_start)
             except CalculatorError as error:
                 self.locate(error, start, self.position)
                 raise
         return value
 
     def unary(self, depth: int) -> Decimal:
+        start = self.position
         if depth > MAX_DEPTH:
             raise CalculatorError("TOO_DEEP", "括号或连续正负号嵌套不能超过 32 层。")
         if self.peek() in ("+", "-"):
             operator = self.take()
             value = self.unary(depth + 1)
             result = value if operator == "+" else -value
-            self.steps.append(
-                {
-                    "operation": f"{operator}({format_decimal(value)})",
-                    "result": format_decimal(result),
-                }
+            return self.record(
+                f"{operator}({format_decimal(value)})",
+                result,
+                start,
+                "正号" if operator == "+" else "取负",
             )
-            return result
         return self.power(depth)
 
     def power(self, depth: int) -> Decimal:
+        start = self.position
         value = self.primary(depth)
         while self.peek() in ("!", "%"):
             operator = self.take()
             if operator == "%":
-                value = self.record(f"{format_decimal(value)}%", value / 100)
+                value = self.record(
+                    f"{format_decimal(value)}%", value / 100, start, "百分比"
+                )
                 continue
             if value != value.to_integral_value() or not 0 <= value <= 69:
                 raise CalculatorError("DOMAIN_ERROR", "阶乘仅支持 0–69 的整数。")
             value = self.record(
-                f"{format_decimal(value)}!", Decimal(math.factorial(int(value)))
+                f"{format_decimal(value)}!",
+                Decimal(math.factorial(int(value))),
+                start,
+                "阶乘",
             )
         if self.peek() == "^":
             self.take()
@@ -178,26 +192,79 @@ class Parser:
             if abs(right) > 10000:
                 raise CalculatorError("NUMERIC_ERROR", "指数绝对值不能超过 10000。")
             value = self.record(
-                f"{format_decimal(value)} ^ {format_decimal(right)}", value**right
+                f"{format_decimal(value)} ^ {format_decimal(right)}",
+                value**right,
+                start,
+                "乘方",
             )
         return value
 
-    def record(self, operation: str, value: Decimal) -> Decimal:
-        self.steps.append({"operation": operation, "result": format_decimal(value)})
+    def record(self, operation: str, value: Decimal, start: int, label: str) -> Decimal:
+        result = format_decimal(value)
+        self.trace(
+            operation,
+            result,
+            self.spans[start][0],
+            self.spans[self.position - 1][1],
+            label,
+        )
         return value
+
+    def trace(self, operation, result, start, end, label):
+        """Replace by source identity, never by matching equal expression text."""
+        indexes = [
+            i for i, (a, b, _) in enumerate(self.fragments) if a >= start and b <= end
+        ]
+        first, last = indexes[0], indexes[-1] + 1
+        before = "".join(text for _, _, text in self.fragments)
+        prefix = "".join(text for _, _, text in self.fragments[:first])
+        selected = "".join(text for _, _, text in self.fragments[first:last])
+        # Parenthesize every negative intermediate, including power bases.
+        replacement = f"({result})" if result.startswith("-") else result
+        if start == self.spans[0][0] and end == self.spans[-1][1]:
+            replacement = result
+        self.fragments[first:last] = [(start, end, replacement)]
+        self.steps.append(
+            {
+                "operation": operation,
+                "result": result,
+                "label": label,
+                "before": before,
+                "after": "".join(text for _, _, text in self.fragments),
+                "highlight_start": len(prefix.encode("utf-16-le")) // 2,
+                "highlight_end": len((prefix + selected).encode("utf-16-le")) // 2,
+            }
+        )
+
+    def finish(self, result):
+        current = "".join(text for _, _, text in self.fragments)
+        if current != result or not self.steps:
+            self.steps.append(
+                {
+                    "operation": current,
+                    "result": result,
+                    "label": "结果整理" if self.steps else "读取数值",
+                    "before": current,
+                    "after": result,
+                    "highlight_start": 0,
+                    "highlight_end": len(current.encode("utf-16-le")) // 2,
+                }
+            )
 
     @located
     def primary(self, depth: int) -> Decimal:
+        start = self.position
         name = self.peek()
         if name in ("pi", "e"):
             self.take()
             with localcontext() as constants_context:
                 constants_context.prec = 40
-                return (
+                value = (
                     Decimal("3.141592653589793238462643383279502884197")
                     if name == "pi"
                     else Decimal(1).exp()
                 )
+            return self.record(name, value, start, "读取常量")
         if name in ARITY:
             self.take()
             self.expect("(", "函数名后需要左括号。")
@@ -219,7 +286,9 @@ class Parser:
                 name + "(" + ", ".join(format_decimal(v) for v in args) + ")" + unit
             )
             try:
-                return self.record(operation, extended(name, args, self.angle_mode))
+                return self.record(
+                    operation, extended(name, args, self.angle_mode), start, name + unit
+                )
             except CalculatorError as error:
                 if error.argument is not None:
                     self.locate(error, *argument_spans[error.argument])
@@ -259,12 +328,14 @@ class Parser:
             unit = (
                 f" [{self.angle_mode.upper()}]" if name in ("sin", "cos", "tan") else ""
             )
-            return self.record(f"{name}({format_decimal(value)}){unit}", result)
+            return self.record(
+                f"{name}({format_decimal(value)}){unit}", result, start, name + unit
+            )
         if self.peek() == "(":
             self.take()
             value = self.expression_value(depth + 1)
             self.expect(")", "这里缺少右括号。")
-            return value
+            return self.record(f"({format_decimal(value)})", value, start, "括号")
         token_start = self.position
         token = self.take()
         if not re.fullmatch(
@@ -285,7 +356,9 @@ class Parser:
         format_decimal(value)
         return value
 
-    def apply(self, left: Decimal, operator: str, right: Decimal) -> Decimal:
+    def apply(
+        self, left: Decimal, operator: str, right: Decimal, start: int
+    ) -> Decimal:
         if operator == "+":
             result = left + right
         elif operator == "-":
@@ -296,20 +369,15 @@ class Parser:
             if right == 0:
                 raise CalculatorError("DIVISION_BY_ZERO", "除数不能为零。")
             result = left / right
-        self.steps.append(
-            {
-                "operation": (
-                    f"{format_decimal(left)} {operator} {format_decimal(right)}"
-                ),
-                "result": format_decimal(result),
-            }
+        return self.record(
+            f"{format_decimal(left)} {operator} {format_decimal(right)}",
+            result,
+            start,
+            {"+": "加法", "-": "减法", "*": "乘法", "/": "除法"}[operator],
         )
-        return result
 
 
-def calculate(
-    expression: str, angle_mode: str = "deg"
-) -> tuple[str, str, list[dict[str, str]]]:
+def calculate(expression: str, angle_mode: str = "deg") -> tuple[str, str, list[dict]]:
     parser = Parser(expression, angle_mode)
     try:
         with localcontext() as context:
@@ -317,7 +385,9 @@ def calculate(
             value = parser.expression_value()
             if parser.peek() is not None:
                 parser.fail("这里需要运算符，请检查括号和小数点。")
-            return parser.expression.strip(), format_decimal(+value), parser.steps
+            result = format_decimal(+value)
+            parser.finish(result)
+            return parser.expression.strip(), result, parser.steps
     except CalculatorError as exc:
         parser.locate(exc, max(0, parser.position - 1), parser.position)
         raise

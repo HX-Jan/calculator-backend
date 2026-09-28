@@ -77,7 +77,9 @@ def test_invalid_expressions(expression):
 
 def test_steps_follow_precedence():
     _, _, steps = calculate("1+2*3")
-    assert steps == [
+    assert [
+        {"operation": step["operation"], "result": step["result"]} for step in steps
+    ] == [
         {"operation": "2 * 3", "result": "6"},
         {"operation": "1 + 6", "result": "7"},
     ]

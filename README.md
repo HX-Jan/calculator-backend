@@ -53,8 +53,33 @@ All successful responses: `{"success":true,"data":...}`. All handled validation/
     "angle_mode": "deg",
     "created_at": "2026-09-27T01:00:00+00:00",
     "steps": [
-      {"operation": "1 + 2", "result": "3"},
-      {"operation": "3 * 3", "result": "9"}
+      {
+        "operation": "1 + 2",
+        "result": "3",
+        "label": "加法",
+        "before": "(1+2)*3",
+        "after": "(3)*3",
+        "highlight_start": 1,
+        "highlight_end": 4
+      },
+      {
+        "operation": "(3)",
+        "result": "3",
+        "label": "括号",
+        "before": "(3)*3",
+        "after": "3*3",
+        "highlight_start": 0,
+        "highlight_end": 3
+      },
+      {
+        "operation": "3 * 3",
+        "result": "9",
+        "label": "乘法",
+        "before": "3*3",
+        "after": "9",
+        "highlight_start": 0,
+        "highlight_end": 3
+      }
     ]
   }
 }
@@ -140,3 +165,12 @@ Ans 插入上次成功结果；MS 存储当前结果，MR 读取，MC 清除。A
 Calculation errors may include `position` and `end_position` in the existing `error` object. They are zero-based UTF-16 offsets into the exact submitted expression, with an exclusive end. A zero-length range marks an insertion point, including missing input at the end. The fields are optional: older clients can ignore them, and transport/database errors do not have source locations.
 
 Example: `2+*3` returns an error range `[2,3)`. Leading whitespace and aliases such as π/×/÷ retain their original source locations even when normalized for evaluation. Invalid scientific arguments include specific domain messages; where possible the range covers the offending argument. Failed calculations never create history. The frontend's undo/redo changes the expression only and does not delete saved records.
+
+
+## 逐步化简接口
+
+计算响应的 `steps` 保留 `operation`、`result` 字符串，新增 `before`、`after`、`label` 字符串及 `highlight_start`、`highlight_end` 整数。范围针对该步 `before` 的 UTF-16 下标，左闭右开，可直接用于 JavaScript `slice`。每一步的 `after` 等于下一步的 `before`，最后一步等于响应的 `result`。
+
+轨迹按解析器实际求值顺序产生，以原始源码范围定位，避免重复子表达式误替换。负数中间值保留必要括号；括号整理、常量读取和最终精度整理会在需要时单独显示。数字全程以字符串传输，展示轨迹不应作为新输入重新计算（内部常量精度可能高于输入限制）。所有步骤可能含舍入值，不是符号证明。
+
+无需数据库迁移；历史不保存步骤。旧客户端仍可读取原字段，新前端对只有旧字段的响应提供列表回退。发布时先更新后端，再更新前端。

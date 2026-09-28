@@ -119,3 +119,15 @@ def test_commit_failure_is_not_success(client, monkeypatch):
     assert response.status_code == 503
     assert response.json()["error"]["code"] == "DATABASE_UNAVAILABLE"
     assert client.get("/api/history").json()["data"]["total"] == 0
+
+
+def test_trace_response_is_additive_and_history_stays_compatible(client):
+    data = client.post("/api/calculate", json={"expression": "(2+3)*4"}).json()["data"]
+    assert data["result"] == "20"
+    assert data["steps"][0]["operation"] == "2 + 3"
+    assert data["steps"][0]["before"] == "(2+3)*4"
+    assert data["steps"][-1]["after"] == "20"
+    assert isinstance(data["steps"][0]["highlight_start"], int)
+    history = client.get("/api/history").json()["data"]["items"]
+    assert history[0]["id"] == data["id"]
+    assert "steps" not in history[0]
