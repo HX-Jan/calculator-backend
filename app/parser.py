@@ -3,6 +3,7 @@
 import math
 import re
 from decimal import Decimal, DecimalException, localcontext
+from functools import wraps
 
 from app.errors import CalculatorError
 from app.scientific import ARITY, extended
@@ -28,6 +29,19 @@ def format_decimal(value: Decimal) -> str:
     return text.rstrip("0").rstrip(".") if "." in text else text
 
 
+def located(method):
+    @wraps(method)
+    def evaluate(self, *args):
+        start = self.position
+        try:
+            return method(self, *args)
+        except CalculatorError as error:
+            self.locate(error, start, self.position)
+            raise
+
+    return evaluate
+
+
 class Parser:
     """expression → term → unary → primary implements mathematical precedence."""
 
@@ -35,9 +49,19 @@ class Parser:
         self.angle_mode = angle_mode
         if len(expression) > MAX_LENGTH:
             raise CalculatorError("EXPRESSION_TOO_LONG", "表达式不能超过 500 个字符。")
-        self.expression = (
-            expression.strip().replace("×", "*").replace("÷", "/").replace("π", "pi")
-        )
+        self.source = expression
+        normalized = []
+        self.offsets = []
+        offset = 0
+        for char in expression:
+            replacement = {"×": "*", "÷": "/", "π": "pi"}.get(char, char)
+            width = len(char.encode("utf-16-le")) // 2
+            normalized.append(replacement)
+            self.offsets.extend([(offset, offset + width)] * len(replacement))
+            offset += width
+        self.source_length = offset
+        self.expression = "".join(normalized)
+        self.spans = []
         self.tokens: list[str] = []
         self.position = 0
         self.steps: list[dict[str, str]] = []
@@ -49,12 +73,42 @@ class Parser:
             match = TOKEN.match(self.expression, offset)
             if not match:
                 raise CalculatorError(
-                    "INVALID_CHARACTER", f"第 {offset + 1} 个字符不受支持。"
+                    "INVALID_CHARACTER",
+                    "这个字符不受支持。",
+                    position=self.offsets[offset][0],
+                    end_position=self.offsets[offset][1],
                 )
             self.tokens.append(match.group())
+            self.spans.append(
+                (self.offsets[match.start()][0], self.offsets[match.end() - 1][1])
+            )
             offset = match.end()
         if not self.tokens:
-            raise CalculatorError("EMPTY_EXPRESSION", "请输入需要计算的表达式。")
+            raise CalculatorError(
+                "EMPTY_EXPRESSION",
+                "请输入需要计算的表达式。",
+                position=0,
+                end_position=0,
+            )
+
+    def locate(self, error, start, end):
+        if error.position is None:
+            error.position = (
+                self.spans[start][0] if start < len(self.spans) else self.source_length
+            )
+            error.end_position = (
+                self.spans[end - 1][1] if end > start else error.position
+            )
+
+    def fail(self, message):
+        error = CalculatorError("INVALID_EXPRESSION", message)
+        self.locate(error, self.position, min(self.position + 1, len(self.spans)))
+        raise error
+
+    def expect(self, expected, message):
+        if self.peek() != expected:
+            self.fail(message)
+        self.take()
 
     def peek(self) -> str | None:
         return self.tokens[self.position] if self.position < len(self.tokens) else None
@@ -62,9 +116,7 @@ class Parser:
     def take(self) -> str:
         token = self.peek()
         if token is None:
-            raise CalculatorError(
-                "INVALID_EXPRESSION", "表达式不完整，请检查数字与运算符。"
-            )
+            self.fail("这里需要数字或表达式。")
         self.position += 1
         return token
 
@@ -79,7 +131,13 @@ class Parser:
         value = self.unary(depth)
         while self.peek() in ("*", "/"):
             operator = self.take()
-            value = self.apply(value, operator, self.unary(depth))
+            start = self.position
+            right = self.unary(depth)
+            try:
+                value = self.apply(value, operator, right)
+            except CalculatorError as error:
+                self.locate(error, start, self.position)
+                raise
         return value
 
     def unary(self, depth: int) -> Decimal:
@@ -128,6 +186,7 @@ class Parser:
         self.steps.append({"operation": operation, "result": format_decimal(value)})
         return value
 
+    @located
     def primary(self, depth: int) -> Decimal:
         name = self.peek()
         if name in ("pi", "e"):
@@ -141,15 +200,16 @@ class Parser:
                 )
         if name in ARITY:
             self.take()
-            if self.take() != "(":
-                raise CalculatorError("INVALID_EXPRESSION", "函数需要括号。")
+            self.expect("(", "函数名后需要左括号。")
+            argument_start = self.position
             args = [self.expression_value(depth + 1)]
+            argument_spans = [(argument_start, self.position)]
             for _ in range(ARITY[name] - 1):
-                if self.take() != ",":
-                    raise CalculatorError("INVALID_EXPRESSION", "参数之间需要逗号。")
+                self.expect(",", "参数之间需要逗号。")
+                argument_start = self.position
                 args.append(self.expression_value(depth + 1))
-            if self.take() != ")":
-                raise CalculatorError("INVALID_EXPRESSION", "函数参数数量或括号错误。")
+                argument_spans.append((argument_start, self.position))
+            self.expect(")", "需要右括号，请检查函数参数数量。")
             unit = (
                 f" [{self.angle_mode.upper()}]"
                 if name in ("asin", "acos", "atan")
@@ -158,14 +218,17 @@ class Parser:
             operation = (
                 name + "(" + ", ".join(format_decimal(v) for v in args) + ")" + unit
             )
-            return self.record(operation, extended(name, args, self.angle_mode))
+            try:
+                return self.record(operation, extended(name, args, self.angle_mode))
+            except CalculatorError as error:
+                if error.argument is not None:
+                    self.locate(error, *argument_spans[error.argument])
+                raise
         if name in ("sqrt", "sin", "cos", "tan", "ln", "log"):
             self.take()
-            if self.take() != "(":
-                raise CalculatorError("INVALID_EXPRESSION", "函数需要括号。")
+            self.expect("(", "函数名后需要左括号。")
             value = self.expression_value(depth + 1)
-            if self.take() != ")":
-                raise CalculatorError("INVALID_EXPRESSION", "括号不匹配。")
+            self.expect(")", "这里缺少右括号。")
             if name == "sqrt":
                 if value < 0:
                     raise CalculatorError("DOMAIN_ERROR", "负数不能开平方。")
@@ -200,14 +263,19 @@ class Parser:
         if self.peek() == "(":
             self.take()
             value = self.expression_value(depth + 1)
-            if self.take() != ")":
-                raise CalculatorError("INVALID_EXPRESSION", "括号不匹配。")
+            self.expect(")", "这里缺少右括号。")
             return value
+        token_start = self.position
         token = self.take()
         if not re.fullmatch(
             r"(?:[0-9]+(?:\.[0-9]*)?|\.[0-9]+)(?:[eE][+-]?[0-9]+)?", token
         ):
-            raise CalculatorError("INVALID_EXPRESSION", "此处需要数字或左括号。")
+            raise CalculatorError(
+                "INVALID_EXPRESSION",
+                "此处需要数字或左括号。",
+                position=self.spans[token_start][0],
+                end_position=self.spans[token_start][1],
+            )
         if (
             len(re.split("[eE]", token)[0].replace(".", "").lstrip("0").rstrip("0"))
             > 28
@@ -248,11 +316,15 @@ def calculate(
             context.prec = 28
             value = parser.expression_value()
             if parser.peek() is not None:
-                raise CalculatorError(
-                    "INVALID_EXPRESSION", "数字之间需要运算符，请检查括号和小数点。"
-                )
-            return parser.expression, format_decimal(+value), parser.steps
+                parser.fail("这里需要运算符，请检查括号和小数点。")
+            return parser.expression.strip(), format_decimal(+value), parser.steps
+    except CalculatorError as exc:
+        parser.locate(exc, max(0, parser.position - 1), parser.position)
+        raise
     except DecimalException as exc:
         raise CalculatorError(
-            "NUMERIC_ERROR", "数值无法计算，请缩小输入范围。"
+            "NUMERIC_ERROR",
+            "数值无法计算，请缩小输入范围。",
+            position=0,
+            end_position=parser.source_length,
         ) from exc

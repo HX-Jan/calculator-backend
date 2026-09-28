@@ -70,7 +70,15 @@ def create_app(database_url: str | None = None) -> FastAPI:
             status_code=exc.status,
             content={
                 "success": False,
-                "error": {"code": exc.code, "message": exc.message},
+                "error": {
+                    "code": exc.code,
+                    "message": exc.message,
+                    **(
+                        {"position": exc.position, "end_position": exc.end_position}
+                        if exc.position is not None
+                        else {}
+                    ),
+                },
             },
         )
 

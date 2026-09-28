@@ -134,3 +134,9 @@ Ans 插入上次成功结果；MS 存储当前结果，MR 读取，MC 清除。A
 函数键包裹选区或光标前完整操作数；没有操作数时自动配对括号。平方、立方、倒数、正负号在结果状态下直接提交后端运算。任意根、任意底对数、排列组合和取余通过双参数窗口输入，确认后按等号。取消不改变算式。
 
 结果可复制原始十进制字符串，也可切换科学计数显示；显示切换不使用浮点数，不改变计算值。Ans、存储和连续计算始终复用原始值，长数以等值科学计数输入。网络或计算错误保留输入；所有实际计算仍调用后端。科学键盘适配 1366×768 桌面，手机端保留较大触控目标。
+
+## Error location contract
+
+Calculation errors may include `position` and `end_position` in the existing `error` object. They are zero-based UTF-16 offsets into the exact submitted expression, with an exclusive end. A zero-length range marks an insertion point, including missing input at the end. The fields are optional: older clients can ignore them, and transport/database errors do not have source locations.
+
+Example: `2+*3` returns an error range `[2,3)`. Leading whitespace and aliases such as π/×/÷ retain their original source locations even when normalized for evaluation. Invalid scientific arguments include specific domain messages; where possible the range covers the offending argument. Failed calculations never create history. The frontend's undo/redo changes the expression only and does not delete saved records.
