@@ -89,7 +89,7 @@ This is an illustrative response, not a claim about the current database. Result
 
 ## Calculation rules
 
-Grammar: `expression → term ((+|-) term)*`; `term → unary ((*|/) unary)*`; `unary → (+|-) unary | power`; `power → primary (!)* [^ unary]`; primary includes numbers, constants, parenthesized expressions and function calls.
+Grammar: `expression → term ((+|-) term)*`; `term → unary ((*|/) unary)*`; `unary → (+|-) unary | power`; `power → primary (!|%)* [^ unary]`; primary includes numbers, constants, parenthesized expressions and function calls.
 
 - Supports decimals, parentheses, unary signs, spaces, `×`/`÷` aliases. Multiplication must be explicit: `2*(3+4)`.
 - Supports sqrt, sin, cos, tan, ln, log, pi/π, e, power `^` and factorial `!`. Only whitelisted functions are accepted; no arbitrary code execution.
@@ -104,12 +104,14 @@ Grammar: `expression → term ((+|-) term)*`; `term → unary ((*|/) unary)*`; `
 app/main.py       HTTP validation, CORS, exception handlers and startup
 app/parser.py     Tokenizer and recursive-descent Decimal evaluator
 app/service.py    Calculate/save, query and delete use cases
+app/scientific.py Whitelisted scientific functions and domain checks
+app/formulas.py   Shared formulas, syntax validation and parameter substitution
 app/database.py   SQLAlchemy model, engine and sessions
 app/errors.py     Client-safe calculation errors
 tests/           Parser, persistence and API regression tests
 ```
 
-No account authentication is implemented. All visitors share the demonstration history and may delete records. CORS is not an authentication mechanism. Do not store sensitive input. This is a coursework demo, not a multi-tenant production service.
+No account authentication is implemented. All visitors share demonstration history and custom formulas, including editing and deletion. CORS is not an authentication mechanism. Do not store sensitive input. This is a coursework demo, not a multi-tenant production service.
 
 ## Tests
 
@@ -207,3 +209,8 @@ Name must be nonblank and at most 40 characters. Expressions retain the 500-char
 All parameter values use the existing numeric expression parser in the selected angle mode and cannot reference variables. Missing/extra parameters fail. Only whole tokens are substituted, each wrapped in parentheses, preserving signs and precedence. The expanded expression must fit 500 characters. Calculation saves exactly one history record; invalid parameters, domain errors or revision conflicts save none. History stores the expanded expression and angle mode, independent of the formula thereafter.
 
 Errors use the normal envelope. Parameter errors additionally contain `error.parameter` (letter); their position offsets refer to that parameter expression. Other evaluation errors refer to the expanded expression. Revision mismatch returns HTTP 409 `FORMULA_CONFLICT`; missing formula returns 404; modifying/deleting a builtin returns 403 `READ_ONLY`. PUT/DELETE use conditional timestamp checks atomically. All builtin and custom calculations stay on the backend; no eval or frontend numerical evaluation is introduced.
+
+
+## Current verification / 当前交付状态
+
+功能基线核对于 2026-10-02：后端 CI 220 项通过（含 PostgreSQL），前端 12 项测试、语法及构建通过。[验证摘要](docs/VERIFICATION.md)。支持科学运算、逐步化简与共享公式库。公开 GitHub 仓库不代表已部署公网；公网入口尚待实际部署验收。
