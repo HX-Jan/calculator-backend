@@ -174,3 +174,36 @@ Example: `2+*3` returns an error range `[2,3)`. Leading whitespace and aliases s
 轨迹按解析器实际求值顺序产生，以原始源码范围定位，避免重复子表达式误替换。负数中间值保留必要括号；括号整理、常量读取和最终精度整理会在需要时单独显示。数字全程以字符串传输，展示轨迹不应作为新输入重新计算（内部常量精度可能高于输入限制）。所有步骤可能含舍入值，不是符号证明。
 
 无需数据库迁移；历史不保存步骤。旧客户端仍可读取原字段，新前端对只有旧字段的响应提供列表回退。发布时先更新后端，再更新前端。
+
+## Shared formula API
+
+Formulas are shared by all visitors, without accounts. Builtins are server constants, not database seeds. The new `formulas` table stores name, expression, JSON parameter labels, angle mode, and timestamps. `create_all` adds this table on startup in SQLite/PostgreSQL; existing history data and columns are unchanged by the formula feature.
+
+| Method | Path | Request / behavior |
+|---|---|---|
+| GET | `/api/formulas?q=` | Search names, return `data.items`; builtins first, custom entries newest first |
+| POST | `/api/formulas/validate` | `{ "expression": "1/x" }` → `data.parameters: ["x"]`; syntax only, no formula evaluation |
+| POST | `/api/formulas` | Create from name, expression, parameter_labels and angle_mode; returns 201 and full formula |
+| PUT | `/api/formulas/{id}` | Same fields plus original updated_at; replace custom formula |
+| DELETE | `/api/formulas/{id}?updated_at=…` | Confirmed deletion using original revision; returns deleted_id |
+| POST | `/api/formulas/{id}/calculate` | parameters, angle_mode, updated_at; returns 201 and the existing calculation response structure |
+
+Example creation:
+
+```json
+{"name":"倒数","expression":"1/x","parameter_labels":{"x":"输入值"},"angle_mode":"deg"}
+```
+
+Returned formula: string `id`, `name`, `expression`, ordered `parameters`, `parameter_labels`, `angle_mode`, `builtin`, `updated_at`; custom records also include `created_at`. Builtins have stable string IDs `circle-area`, `circle-length`, `hypotenuse`, `quadratic`, and null updated_at. Custom IDs are decimal strings. Dates are UTC ISO 8601. Preserve updated_at exactly for edits, deletion and calculation of custom formulas.
+
+Example calculation body:
+
+```json
+{"parameters":{"x":"1/3"},"angle_mode":"deg","updated_at":"<original returned timestamp>"}
+```
+
+Name must be nonblank and at most 40 characters. Expressions retain the 500-character and 32-depth bounds. Parameters are single lowercase letters except e, at most 8 in first-appearance order; pi/e and all existing function names remain reserved. Parameter labels are optional, default to their letters, and have a 40-character bound. No implicit multiplication. Zero-parameter formulas are allowed. Validation accepts `1/x` and domain-dependent formulas such as `sqrt(-1)+x`, but rejects invalid syntax and invalid numeric literals without saving history.
+
+All parameter values use the existing numeric expression parser in the selected angle mode and cannot reference variables. Missing/extra parameters fail. Only whole tokens are substituted, each wrapped in parentheses, preserving signs and precedence. The expanded expression must fit 500 characters. Calculation saves exactly one history record; invalid parameters, domain errors or revision conflicts save none. History stores the expanded expression and angle mode, independent of the formula thereafter.
+
+Errors use the normal envelope. Parameter errors additionally contain `error.parameter` (letter); their position offsets refer to that parameter expression. Other evaluation errors refer to the expanded expression. Revision mismatch returns HTTP 409 `FORMULA_CONFLICT`; missing formula returns 404; modifying/deleting a builtin returns 403 `READ_ONLY`. PUT/DELETE use conditional timestamp checks atomically. All builtin and custom calculations stay on the backend; no eval or frontend numerical evaluation is introduced.

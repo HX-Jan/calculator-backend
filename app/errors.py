@@ -11,6 +11,7 @@ class CalculatorError(Exception):
         position=None,
         end_position=None,
         argument=None,
+        parameter=None,
     ):
         super().__init__(message)
         self.code = code
@@ -19,3 +20,4 @@ class CalculatorError(Exception):
         self.position = position
         self.end_position = end_position
         self.argument = argument
+        self.parameter = parameter

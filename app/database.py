@@ -2,7 +2,7 @@
 
 from datetime import UTC, datetime
 
-from sqlalchemy import DateTime, Integer, String, create_engine, inspect, text
+from sqlalchemy import JSON, DateTime, Integer, String, create_engine, inspect, text
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, sessionmaker
 
 
@@ -33,6 +33,38 @@ class History(Base):
             "result": self.result,
             "angle_mode": self.angle_mode,
             "created_at": timestamp.isoformat(),
+        }
+
+
+class Formula(Base):
+    __tablename__ = "formulas"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    name: Mapped[str] = mapped_column(String(40))
+    expression: Mapped[str] = mapped_column(String(500))
+    parameter_labels: Mapped[dict] = mapped_column(JSON)
+    angle_mode: Mapped[str] = mapped_column(String(3), default="deg")
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(UTC)
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(UTC)
+    )
+
+    def as_dict(self):
+        def stamp(value):
+            return (
+                value.replace(tzinfo=UTC) if value.tzinfo is None else value
+            ).isoformat()
+
+        return {
+            "id": str(self.id),
+            "name": self.name,
+            "expression": self.expression,
+            "parameter_labels": self.parameter_labels,
+            "angle_mode": self.angle_mode,
+            "created_at": stamp(self.created_at),
+            "updated_at": stamp(self.updated_at),
+            "builtin": False,
         }
 
 

@@ -32,3 +32,48 @@ def test_postgres_persistence_contract():
             ]
             == 0
         )
+
+
+@pytest.mark.skipif(not os.getenv("TEST_POSTGRES_URL"), reason="No test PostgreSQL URL")
+def test_postgres_formula_persistence_and_revision():
+    url = os.environ["TEST_POSTGRES_URL"]
+    with TestClient(create_app(url)) as client:
+        response = client.post(
+            "/api/formulas",
+            json={"name": "测试" + uuid4().hex[:12], "expression": "x+1"},
+        )
+        assert response.status_code == 201
+        item = response.json()["data"]
+    with TestClient(create_app(url)) as client:
+        try:
+            changed = client.put(
+                f"/api/formulas/{item['id']}",
+                json={
+                    "name": item["name"],
+                    "expression": "x+2",
+                    "updated_at": item["updated_at"],
+                },
+            )
+            assert changed.status_code == 200
+            updated = changed.json()["data"]
+            assert updated["expression"] == "x+2"
+            assert (
+                client.put(
+                    f"/api/formulas/{item['id']}",
+                    json={
+                        "name": item["name"],
+                        "expression": "x",
+                        "updated_at": item["updated_at"],
+                    },
+                ).status_code
+                == 409
+            )
+            item = updated
+        finally:
+            assert (
+                client.delete(
+                    f"/api/formulas/{item['id']}",
+                    params={"updated_at": item["updated_at"]},
+                ).status_code
+                == 200
+            )

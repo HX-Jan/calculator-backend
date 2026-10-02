@@ -18,6 +18,7 @@ from sqlalchemy.orm import Session
 from app import service
 from app.database import connect_database, initialize_database
 from app.errors import CalculatorError
+from app.formulas import install_formula_routes
 
 load_dotenv()
 logger = logging.getLogger(__name__)
@@ -52,7 +53,7 @@ def create_app(database_url: str | None = None) -> FastAPI:
             ).split(",")
             if value.strip()
         ],
-        allow_methods=["GET", "POST", "DELETE"],
+        allow_methods=["GET", "POST", "PUT", "DELETE"],
         allow_headers=["Content-Type"],
     )
 
@@ -73,6 +74,7 @@ def create_app(database_url: str | None = None) -> FastAPI:
                 "error": {
                     "code": exc.code,
                     "message": exc.message,
+                    **({"parameter": exc.parameter} if exc.parameter else {}),
                     **(
                         {"position": exc.position, "end_position": exc.end_position}
                         if exc.position is not None
@@ -140,6 +142,7 @@ def create_app(database_url: str | None = None) -> FastAPI:
     ):
         return {"success": True, "data": service.delete_history(session, record_id)}
 
+    install_formula_routes(application, get_session)
     return application
 
 
