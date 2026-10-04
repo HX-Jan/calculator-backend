@@ -5,7 +5,9 @@ from uuid import uuid4
 
 import pytest
 from fastapi.testclient import TestClient
+from sqlalchemy import String, create_engine, inspect, text
 
+from app.database import initialize_database
 from app.main import create_app
 
 
@@ -77,3 +79,73 @@ def test_postgres_formula_persistence_and_revision():
                 ).status_code
                 == 200
             )
+
+
+@pytest.mark.skipif(not os.getenv("TEST_POSTGRES_URL"), reason="No test PostgreSQL URL")
+def test_postgres_legacy_result_column_upgrade_preserves_long_results():
+    url = os.environ["TEST_POSTGRES_URL"].replace(
+        "postgresql://", "postgresql+psycopg://", 1
+    )
+    schema = "audit_" + uuid4().hex
+    admin = create_engine(url)
+    # An isolated schema exercises legacy DDL without changing shared test tables.
+    with admin.begin() as connection:
+        connection.execute(text(f'CREATE SCHEMA "{schema}"'))
+    engine = create_engine(url, connect_args={"options": f"-csearch_path={schema}"})
+    expression = "-1.234567890123456789012345678E-1000"
+    expected = "-0." + "0" * 999 + "1234567890123456789012345678"
+    try:
+        with engine.begin() as connection:
+            connection.execute(
+                text(
+                    "CREATE TABLE calculation_history (id INTEGER PRIMARY KEY, "
+                    "expression VARCHAR(500) NOT NULL, result VARCHAR(1024) NOT NULL, "
+                    "created_at TIMESTAMPTZ NOT NULL)"
+                )
+            )
+            connection.execute(
+                text(
+                    "INSERT INTO calculation_history VALUES "
+                    "(1, '1+2', '3', CURRENT_TIMESTAMP)"
+                )
+            )
+        for _ in range(2):
+            initialize_database(engine)
+        result_type = next(
+            c["type"]
+            for c in inspect(engine).get_columns("calculation_history")
+            if c["name"] == "result"
+        )
+        assert isinstance(result_type, String) and result_type.length is None
+        with engine.begin() as connection:
+            assert (
+                connection.scalar(
+                    text("SELECT result FROM calculation_history WHERE id=1")
+                )
+                == "3"
+            )
+            assert (
+                connection.scalar(
+                    text("SELECT angle_mode FROM calculation_history WHERE id=1")
+                )
+                == "deg"
+            )
+            connection.execute(
+                text(
+                    "INSERT INTO calculation_history "
+                    "(id,expression,result,created_at) "
+                    "VALUES (2,:expression,:result,CURRENT_TIMESTAMP)"
+                ),
+                {"expression": expression, "result": expected},
+            )
+            assert (
+                connection.scalar(
+                    text("SELECT result FROM calculation_history WHERE id=2")
+                )
+                == expected
+            )
+    finally:
+        engine.dispose()
+        with admin.begin() as connection:
+            connection.execute(text(f'DROP SCHEMA "{schema}" CASCADE'))
+        admin.dispose()

@@ -131,3 +131,18 @@ def test_trace_response_is_additive_and_history_stays_compatible(client):
     history = client.get("/api/history").json()["data"]["items"]
     assert history[0]["id"] == data["id"]
     assert "steps" not in history[0]
+
+
+def test_small_result_preserves_all_digits_across_restart(database_url):
+    expression = "-1.234567890123456789012345678E-1000"
+    expected = "-0." + "0" * 999 + "1234567890123456789012345678"
+    assert len(expected) > 1024
+    with TestClient(create_app(database_url)) as client:
+        response = client.post("/api/calculate", json={"expression": expression})
+        assert response.status_code == 201
+        record = response.json()["data"]
+        assert record["result"] == expected
+    with TestClient(create_app(database_url)) as client:
+        saved = client.get("/api/history").json()["data"]["items"][0]
+        assert saved["id"] == record["id"]
+        assert saved["result"] == expected

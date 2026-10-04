@@ -2,7 +2,16 @@
 
 from datetime import UTC, datetime
 
-from sqlalchemy import JSON, DateTime, Integer, String, create_engine, inspect, text
+from sqlalchemy import (
+    JSON,
+    DateTime,
+    Integer,
+    String,
+    Text,
+    create_engine,
+    inspect,
+    text,
+)
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, sessionmaker
 
 
@@ -18,7 +27,7 @@ class History(Base):
     angle_mode: Mapped[str] = mapped_column(
         String(3), default="deg", server_default="deg"
     )
-    result: Mapped[str] = mapped_column(String(1024))
+    result: Mapped[str] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(UTC), index=True
     )
@@ -84,10 +93,20 @@ def initialize_database(engine):
     with engine.begin() as connection:
         if engine.dialect.name == "postgresql":
             connection.execute(text("SELECT pg_advisory_xact_lock(620530837)"))
-        columns = {
-            column["name"]
-            for column in inspect(connection).get_columns("calculation_history")
-        }
+        history_columns = inspect(connection).get_columns("calculation_history")
+        columns = {column["name"] for column in history_columns}
+        if engine.dialect.name == "postgresql":
+            result_type = next(
+                column["type"]
+                for column in history_columns
+                if column["name"] == "result"
+            )
+            if isinstance(result_type, String) and result_type.length is not None:
+                connection.execute(
+                    text(
+                        "ALTER TABLE calculation_history ALTER COLUMN result TYPE TEXT"
+                    )
+                )
         if "angle_mode" not in columns:
             connection.execute(
                 text(

@@ -34,7 +34,7 @@ API documentation: http://127.0.0.1:8000/docs. Health: http://127.0.0.1:8000/api
 | `DATABASE_URL` | `sqlite:///./calculator.db` | Local SQLite file or PostgreSQL URL |
 | `ALLOWED_ORIGINS` | `http://localhost:5173,http://127.0.0.1:5173` | Comma-separated exact origins without trailing slash |
 
-The local app creates `calculation_history` and `formulas` on startup. Restarting with the same URL preserves data; moving or deleting SQLite changes the data source. Idempotent SQLite/PostgreSQL migrations add angle_mode with default deg to older history, preserving records. Back up databases before upgrades.
+The local app creates `calculation_history` and `formulas` on startup. Restarting with the same URL preserves data; moving or deleting SQLite changes the data source. Results use TEXT; older bounded PostgreSQL result columns are upgraded to TEXT. Idempotent SQLite/PostgreSQL migrations add angle_mode with default deg to older history, preserving records. Back up databases before upgrades.
 
 Separate servers can use `postgresql://USER:PASSWORD@HOST/DB?sslmode=require`, converted to the psycopg SQLAlchemy driver. Cloudflare uses D1 independently of local data; local demonstration records are not uploaded. Store secrets only on the hosting platform. `.env` and database files are excluded from Git.
 
@@ -148,7 +148,7 @@ History/formulas are shared and editable/deletable by all visitors. There is no 
 .\.venv\Scripts\ruff.exe format --check app tests
 ```
 
-Tests use temporary SQLite databases and a PostgreSQL CI service, without clearing user databases. As of 2026-10-04, CI passed 232 tests with 98% coverage. Locally, 230 passed and two PostgreSQL tests were skipped because no database was configured. Frontend passed 12 tests and build. [Verification (Chinese)](docs/VERIFICATION.md)
+Tests use temporary SQLite databases and a PostgreSQL CI service, without clearing user databases. As of 2026-10-04, CI passed 234 tests with 98% coverage. Locally, 231 passed and three PostgreSQL tests were skipped because no database was configured. Frontend passed 12 tests and build. [Verification (Chinese)](docs/VERIFICATION.md)
 
 ## Deployment
 

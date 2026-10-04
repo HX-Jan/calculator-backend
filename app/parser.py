@@ -43,7 +43,7 @@ def located(method):
 
 
 class Parser:
-    """expression → term → unary → primary implements mathematical precedence."""
+    """Precedence: expression → term → unary → power → primary."""
 
     def __init__(self, expression: str, angle_mode: str = "deg"):
         self.angle_mode = angle_mode

@@ -4,9 +4,9 @@
 
 | 检查项目 | 结果与依据 |
 |---|---|
-| 后端 CI | 232 项通过，覆盖率 98%，包括 PostgreSQL；[检查记录](https://github.com/HX-Jan/calculator-backend/actions/runs/37205630414) |
+| 后端 CI | 234 项通过，覆盖率 98%，包括 PostgreSQL；[检查记录](https://github.com/HX-Jan/calculator-backend/actions/runs/37205630414) |
 | 前端 CI | 12 项测试、语法检查和构建通过；[检查记录](https://github.com/HX-Jan/calculator-frontend/actions/runs/37206694865) |
-| 本地后端 | 230 项通过；未配置 PostgreSQL，相关 2 项跳过 |
+| 本地后端 | 231 项通过；未配置 PostgreSQL，相关 3 项跳过 |
 | 配图 | 19 张本地运行截图；3 张设计图已补齐线上 D1 和错误分支，并移除功能图底部旧说明 |
 | Cloudflare 配置 | Worker 名称 calculator，D1 绑定为原 calculator 数据库，账号子域名 assignment1 |
 | 当前网址访问 | DNS 记录存在；当前网络连接重置，未完成新网址的端到端复验 |

@@ -34,7 +34,7 @@ macOS/Linux 将 Python 路径改为 `.venv/bin/python`，使用 `cp .env.example
 | `DATABASE_URL` | `sqlite:///./calculator.db` | 本地 SQLite 文件或 PostgreSQL 连接地址 |
 | `ALLOWED_ORIGINS` | `http://localhost:5173,http://127.0.0.1:5173` | 逗号分隔的精确来源，不带末尾斜杠 |
 
-本地服务启动创建 `calculation_history` 和 `formulas` 表。同一数据库地址重启保留数据；移动或删除 SQLite 文件会改变数据源。旧历史表通过幂等 SQLite/PostgreSQL 迁移补充默认 `deg` 的 `angle_mode`，保留原记录；升级前应备份数据库。
+本地服务启动创建 `calculation_history` 和 `formulas` 表。同一数据库地址重启保留数据；移动或删除 SQLite 文件会改变数据源。历史结果使用 TEXT，旧 PostgreSQL 限长结果列自动升级为 TEXT。旧历史表通过幂等 SQLite/PostgreSQL 迁移补充默认 `deg` 的 `angle_mode`，保留原记录；升级前应备份数据库。
 
 独立服务器可使用 `postgresql://USER:PASSWORD@HOST/DB?sslmode=require`，自动转换为 psycopg SQLAlchemy 驱动。Cloudflare 线上版本使用 D1，与本地数据库分离；不会上传本地演示记录。密钥仅存放在部署平台，`.env` 和数据库文件不提交。
 
@@ -148,7 +148,7 @@ steps 保留字符串 `operation`、`result`，另含 `before`、`after`、`labe
 .\.venv\Scripts\ruff.exe format --check app tests
 ```
 
-测试使用临时 SQLite，CI 另有 PostgreSQL 服务，不清空用户数据库。截至 2026-10-04，CI 232 项通过、覆盖率 98%；本地 230 项通过、2 项 PostgreSQL 测试因未配置数据库跳过。前端 12 项及构建通过。[验证记录](docs/VERIFICATION.md)
+测试使用临时 SQLite，CI 另有 PostgreSQL 服务，不清空用户数据库。截至 2026-10-04，CI 234 项通过、覆盖率 98%；本地 231 项通过、3 项 PostgreSQL 测试因未配置数据库跳过。前端 12 项及构建通过。[验证记录](docs/VERIFICATION.md)
 
 ## 部署
 
