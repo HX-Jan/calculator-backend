@@ -9,3 +9,11 @@ __pycache__/
 .coverage
 htmlcov/
 *.log
+node_modules/
+.wrangler/
+public/
+python_modules/
+.venv-workers/
+cloudflare/.venv/
+cloudflare/src/app/
+cloudflare/frontend-source/

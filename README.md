@@ -1,5 +1,7 @@
 # Clarity Calculator Backend
 
+在线体验：[Cloudflare 计算器](https://hx-jan-calculator.hongxiang-jan777.workers.dev)。本次上线使用 Python Workers + 静态前端 + D1，参见 [Cloudflare 部署说明](cloudflare/README.md)。计算解析器和公式规则与本机版本共用，SQLite/PostgreSQL 运行方式继续保留。
+
 Python HTTP API for a front-end/back-end separated calculator. The backend validates and evaluates every expression, commits successful results to a database, and serves searchable, paginated history.
 
 配套前端：[calculator-frontend](https://github.com/HX-Jan/calculator-frontend)。本项目由 AI 辅助实现与测试，使用者应理解代码并按课程要求声明辅助范围。

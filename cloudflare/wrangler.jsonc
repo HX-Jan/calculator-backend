@@ -1,0 +1,22 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "hx-jan-calculator",
+  "main": "src/entry.py",
+  "compatibility_date": "2026-09-07",
+  "compatibility_flags": [
+    "python_workers"
+  ],
+  "assets": {
+    "directory": "./public",
+    "binding": "ASSETS",
+    "run_worker_first": ["/api/*", "/docs", "/openapi.json"]
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "calculator",
+      "database_id": "7373bdd2-6783-4544-9a36-8adf3bea8ec7",
+      "migrations_dir": "../migrations"
+    }
+  ]
+}
