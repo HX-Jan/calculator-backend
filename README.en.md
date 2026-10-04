@@ -156,4 +156,4 @@ Tests use temporary SQLite databases and a PostgreSQL CI service, without cleari
 
 Production uses Python Workers, Workers Static Assets and D1, sharing parser/formula rules with the local app. Local SQLite and separate-server PostgreSQL remain supported. See [Cloudflare guide (Chinese)](cloudflare/README.md) and [code standards](codestyle.md). GitHub Actions checks code without automatic deployment.
 
-Current site: https://calculator.assignment1.workers.dev. DNS records, deployment and D1 bindings are confirmed. Connections reset on the current network; end-to-end access on the current domain and direct mainland-China access have not been reverified.
+Current site: https://calculator.assignment1.workers.dev. The interface update is deployed to the existing calculator Worker with unchanged D1 bindings. Public accessibility is outside the scope of this review.

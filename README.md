@@ -156,4 +156,4 @@ steps 保留字符串 `operation`、`result`，另含 `before`、`after`、`labe
 
 线上采用 Python Workers、Workers Static Assets 和 D1，与本机共用解析器和公式规则。本机仍支持 SQLite，独立服务器支持 PostgreSQL。部署命令见 [Cloudflare 指南](cloudflare/README.md)，代码规范见 [codestyle.md（英文）](codestyle.md)。GitHub Actions 只检查，不自动部署。
 
-当前网址：https://calculator.assignment1.workers.dev 。域名记录、部署及 D1 绑定已确认，但当前网络连接重置，新域名端到端访问及国内直连尚未复验。
+当前网址：https://calculator.assignment1.workers.dev 。界面更新已部署到现有 calculator Worker，D1 绑定保持不变；公网访问不在本轮复查范围。
