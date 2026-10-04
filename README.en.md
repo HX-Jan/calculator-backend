@@ -150,7 +150,7 @@ History/formulas are shared and editable/deletable by all visitors. There is no 
 .\.venv\Scripts\ruff.exe format --check app tests
 ```
 
-Tests use temporary SQLite databases and a PostgreSQL CI service, without clearing user databases. As of 2026-10-04, CI passed 234 tests with 98% coverage. Locally, 231 passed and three PostgreSQL tests were skipped because no database was configured. Frontend passed 12 tests and build. [Verification (Chinese)](docs/VERIFICATION.md)
+Tests use temporary SQLite databases and a PostgreSQL CI service, without clearing user databases. As of 2026-10-04, CI passed 234 tests with 98% coverage. Locally, 231 passed and three PostgreSQL tests were skipped because no database was configured. Frontend passed 18 tests and build. [Verification (Chinese)](docs/VERIFICATION.md)
 
 ## Deployment
 

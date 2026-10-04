@@ -150,7 +150,7 @@ steps 保留字符串 `operation`、`result`，另含 `before`、`after`、`labe
 .\.venv\Scripts\ruff.exe format --check app tests
 ```
 
-测试使用临时 SQLite，CI 另有 PostgreSQL 服务，不清空用户数据库。截至 2026-10-04，CI 234 项通过、覆盖率 98%；本地 231 项通过、3 项 PostgreSQL 测试因未配置数据库跳过。前端 12 项及构建通过。[验证记录](docs/VERIFICATION.md)
+测试使用临时 SQLite，CI 另有 PostgreSQL 服务，不清空用户数据库。截至 2026-10-04，CI 234 项通过、覆盖率 98%；本地 231 项通过、3 项 PostgreSQL 测试因未配置数据库跳过。前端 18 项及构建通过。[验证记录](docs/VERIFICATION.md)
 
 ## 部署
 
