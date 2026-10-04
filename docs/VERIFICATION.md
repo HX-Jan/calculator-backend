@@ -1,26 +1,32 @@
-# 项目审查与测试报告
+# 验证与博客对应说明
 
-核对日期：2026-10-04。当前入口：https://calculator.assignment1.workers.dev。
+核对日期：2026-10-04。网站入口：https://calculator.assignment1.workers.dev 。
 
-| 检查 | 结果 |
+| 检查项目 | 结果与依据 |
 |---|---|
-| 本轮本地后端回归 | 230 通过、2 项 PostgreSQL 测试跳过；本机未配置测试数据库 |
-| 已完成的后端 CI | 232 通过，覆盖率 98%；包含 PostgreSQL |
-| 本轮前端检查 | 12 项测试、语法检查、生产构建通过 |
-| 部署更名 | Workers 项目名为 calculator；仍绑定原 calculator D1 数据库 |
-| 新域名网络复查 | 当前网络出现 TLS 连接失败，不能声称新地址已完成端到端访问验收 |
-| 截图 | 19 张界面图、3 张设计图；2026-10-02 本地运行截图，未冒充公网截图 |
+| 后端 CI | 232 项通过，覆盖率 98%，包括 PostgreSQL；[检查记录](https://github.com/HX-Jan/calculator-backend/actions/runs/37205630414) |
+| 前端 CI | 12 项测试、语法检查和构建通过；[检查记录](https://github.com/HX-Jan/calculator-frontend/actions/runs/37206694865) |
+| 本地后端 | 230 项通过；未配置 PostgreSQL，相关 2 项跳过 |
+| 配图 | 19 张本地运行截图；3 张设计图已补齐线上 D1 和错误分支，并移除功能图底部旧说明 |
+| Cloudflare 配置 | Worker 名称 calculator，D1 绑定为原 calculator 数据库，账号子域名 assignment1 |
+| 当前网址访问 | DNS 记录存在；当前网络连接重置，未完成新网址的端到端复验 |
 
-## 本轮修改
+## 博客与代码对应
 
-统一网站链接和 Calculator 名称；纠正英文“尚未部署”与 Render 部署说明；更新功能概览、提交清单和测试摘要。博客已填入课程个人信息，复盘根据实际迭代起草。预计工时保持原规划，实际个人工时未完整记录。
+| 博客内容 | 代码或文件 |
+|---|---|
+| 四则、科学函数、优先级及精度 | 后端 `app/parser.py`、`app/scientific.py` |
+| 结果由后端计算并返回字符串 | 后端计算路由；前端 `src/api.js`、`src/result-view.js` |
+| 历史搜索、分页、指定删除 | 后端 `app/service.py`、`app/main.py`；Cloudflare 使用 `app/cloudflare.py` |
+| SQLite/PostgreSQL 与线上 D1 | 后端 `app/database.py`、`migrations/0001_cloudflare.sql` 和 Workers 绑定 |
+| 函数包裹、连续计算、100 步撤销重做 | 前端 `src/expression-editor.js`、`src/main.js` |
+| 逐步化简与 UTF-16 高亮 | 后端 `app/parser.py`；前端 `src/steps-view.js` |
+| 公式校验、参数代入、版本冲突 | 后端 `app/formula_rules.py`、`app/formulas.py`、`app/cloudflare.py`；前端 `src/formula-library.js` |
+| 普通/科学、DEG/RAD、主题和手机布局 | 前端 `index.html`、`src/main.js`、`src/style.css` |
+| 历史当前页 CSV 导出 | 前端 `src/history-utils.js` |
 
-## 验证范围
+本轮对照本人修改后的博客更新 README、模块说明和验证记录；运算及交互功能没有新增。博客各项工时以本人填写的数值为准，预计合计 14 小时、实际合计 13 小时。
 
-回归覆盖科学运算、优先级、定义域、Decimal 精度、错误位置、数据库提交失败、历史搜索与删除、旧数据库迁移、公式参数代入和版本冲突，以及前端编辑、撤销、连续计算与导出。此前 Cloudflare 公网接口检查覆盖计算、公式增删改、冲突、无效输入和重新部署后持久化；此前入口为 hx-jan-calculator.hongxiang-jan777.workers.dev。
+此前 Cloudflare 原地址完成过科学运算、公式增删改、冲突、非法输入及重部署后持久化检查。它们不是新地址的复验结果。界面截图仍为 2026-10-02 本地运行画面；390px 截图是浏览器视口，网络失败通过请求阻断模拟。
 
-当前未修改运算逻辑；主题及手机截图沿用之前验收，没有声称本轮重新进行浏览器交互。没有负载测试和账户隔离；历史及公式是共享数据。
-
-测试客户端有一条 Starlette/httpx 弃用提示，不影响测试通过。新域名国内直连、真实手机操作和公网截图仍需补验。CSDN 未发布。
-
-已完成 CI：[后端](https://github.com/HX-Jan/calculator-backend/actions/runs/37198763291)、[前端](https://github.com/HX-Jan/calculator-frontend/actions/runs/37198760261)。本轮提交后的检查结果另见核对结果。
+历史及公式共享，没有账号隔离。未进行大规模并发测试；测试客户端有一条 Starlette/httpx 弃用提示。CSDN 文稿尚未发布。

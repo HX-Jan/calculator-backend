@@ -4,7 +4,13 @@
 
 Python HTTP API for a front-end/back-end separated calculator. The backend validates and evaluates every expression, commits successful results to a database, and serves searchable, paginated history.
 
-配套前端：[calculator-frontend](https://github.com/HX-Jan/calculator-frontend)。本项目由 AI 辅助实现与测试，使用者应理解代码并按课程要求声明辅助范围。
+配套前端：[calculator-frontend](https://github.com/HX-Jan/calculator-frontend)。
+
+## 项目负责人及工具使用
+
+项目负责人：洪翔（HX-Jan）。项目的需求范围、界面风格和功能迭代方向由本人确定，包括普通/科学模式、输入编辑、计算步骤和公式库的取舍。界面调整根据本人提出的使用反馈进行，部署方案和账号授权也由本人选择、确认。
+
+开发过程中使用 AI 辅助需求细化、代码实现与修改、测试执行、部署操作和文档整理。需求决策与工具执行分别说明，不将辅助工具执行的工作描述为本人独立编写或手动完成。
 
 ## Environment and installation
 
@@ -30,9 +36,9 @@ API documentation: http://127.0.0.1:8000/docs. Health: http://127.0.0.1:8000/api
 | `DATABASE_URL` | `sqlite:///./calculator.db` | SQLite file relative to the server working directory, or PostgreSQL URL |
 | `ALLOWED_ORIGINS` | `http://localhost:5173,http://127.0.0.1:5173` | Comma-separated exact frontend origins without trailing slash |
 
-The application creates the `calculation_history` table on startup. Restarting with the same database URL preserves records. Deleting or moving the SQLite file changes the data source. `.env` and database files are excluded from Git.
+The local application creates the `calculation_history` and `formulas` tables on startup. Restarting with the same database URL preserves records. Deleting or moving the SQLite file changes the data source. `.env` and database files are excluded from Git.
 
-Production: use a PostgreSQL connection string with TLS, such as `postgresql://USER:PASSWORD@HOST/DB?sslmode=require`. The application converts this to the psycopg SQLAlchemy driver. Set secrets only in the hosting platform, never in Git. Local and hosted databases are independent; local demonstration rows are not uploaded.
+For a separate server running `app.main:app`, use a PostgreSQL connection string with TLS, such as `postgresql://USER:PASSWORD@HOST/DB?sslmode=require`. The application converts this to the psycopg SQLAlchemy driver. Set secrets only in the hosting platform, never in Git. Local and hosted databases are independent; local demonstration rows are not uploaded.
 
 ## API contract
 
@@ -107,7 +113,11 @@ app/main.py       HTTP validation, CORS, exception handlers and startup
 app/parser.py     Tokenizer and recursive-descent Decimal evaluator
 app/service.py    Calculate/save, query and delete use cases
 app/scientific.py Whitelisted scientific functions and domain checks
-app/formulas.py   Shared formulas, syntax validation and parameter substitution
+app/formulas.py   SQLite/PostgreSQL formula routes and revision checks
+app/formula_rules.py Shared syntax validation, builtin formulas and substitution rules
+app/cloudflare.py Cloudflare API adapter using D1 bindings
+cloudflare/src/entry.py Python Workers ASGI entrypoint
+migrations/0001_cloudflare.sql D1 schema initialization
 app/database.py   SQLAlchemy model, engine and sessions
 app/errors.py     Client-safe calculation errors
 tests/           Parser, persistence and API regression tests
@@ -181,7 +191,7 @@ Example: `2+*3` returns an error range `[2,3)`. Leading whitespace and aliases s
 
 ## Shared formula API
 
-Formulas are shared by all visitors, without accounts. Builtins are server constants, not database seeds. The new `formulas` table stores name, expression, JSON parameter labels, angle mode, and timestamps. `create_all` adds this table on startup in SQLite/PostgreSQL; existing history data and columns are unchanged by the formula feature.
+Formulas are shared by all visitors, without accounts. Builtins are server constants, not database seeds. The `formulas` table stores name, expression, parameter labels, angle mode, and timestamps. Labels use a JSON column in the SQLAlchemy model and JSON-encoded TEXT in D1. `create_all` adds this table on startup in SQLite/PostgreSQL; existing history data and columns are unchanged by the formula feature.
 
 | Method | Path | Request / behavior |
 |---|---|---|
@@ -215,4 +225,6 @@ Errors use the normal envelope. Parameter errors additionally contain `error.par
 
 ## Current verification / 当前交付状态
 
-功能基线核对于 2026-10-02：后端 CI 220 项通过（含 PostgreSQL），前端 12 项测试、语法及构建通过。[验证摘要](docs/VERIFICATION.md)。支持科学运算、逐步化简与共享公式库。公开 GitHub 仓库不代表已部署公网；公网入口尚待实际部署验收。
+截至 2026-10-04，后端 GitHub CI 232 项测试通过（包含 PostgreSQL），覆盖率 98%；前端 12 项测试、语法检查和构建通过。科学运算、逐步化简、错误定位、撤销重做及共享公式库均已有实现，详见[验证摘要](docs/VERIFICATION.md)。
+
+Cloudflare 部署已完成，当前入口为 https://calculator.assignment1.workers.dev 。域名解析及数据库绑定已确认；当前网络访问仍出现连接重置，新地址的端到端操作和国内直连未完成复验。GitHub Actions 检查代码，不自动部署网站。

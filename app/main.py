@@ -41,9 +41,7 @@ def create_app(database_url: str | None = None) -> FastAPI:
         yield
         engine.dispose()
 
-    application = FastAPI(
-        title="Clarity Calculator API", version="1.0.0", lifespan=lifespan
-    )
+    application = FastAPI(title="Calculator API", version="1.0.0", lifespan=lifespan)
     application.add_middleware(
         CORSMiddleware,
         allow_origins=[
