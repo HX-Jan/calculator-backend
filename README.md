@@ -6,11 +6,9 @@ Python HTTP API for a front-end/back-end separated calculator. The backend valid
 
 配套前端：[calculator-frontend](https://github.com/HX-Jan/calculator-frontend)。
 
-## 项目负责人及工具使用
+## 项目信息
 
-项目负责人：洪翔（HX-Jan）。项目的需求范围、界面风格和功能迭代方向由本人确定，包括普通/科学模式、输入编辑、计算步骤和公式库的取舍。界面调整根据本人提出的使用反馈进行，部署方案和账号授权也由本人选择、确认。
-
-开发过程中使用 AI 辅助需求细化、代码实现与修改、测试执行、部署操作和文档整理。需求决策与工具执行分别说明，不将辅助工具执行的工作描述为本人独立编写或手动完成。
+负责人：[洪翔 / HX-Jan](https://github.com/HX-Jan)。负责需求规划、界面方案和功能迭代方向。开发过程见[开发说明](docs/DEVELOPMENT.md)。
 
 ## Environment and installation
 
