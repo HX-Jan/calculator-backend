@@ -1,6 +1,6 @@
 # Cloudflare 部署
 
-线上地址：https://hx-jan-calculator.hongxiang-jan777.workers.dev
+线上地址：https://calculator.hongxiang-jan777.workers.dev
 
 Python Workers 运行 FastAPI 和原有安全计算引擎；Workers Static Assets 托管前端；D1 保存历史和共享公式。前后端同域，无须跨域配置、服务器或独立 PostgreSQL。原来的 SQLite/PostgreSQL 部署仍可使用 `app.main:app`。
 

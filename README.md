@@ -1,6 +1,6 @@
-# Clarity Calculator Backend
+# Calculator Backend
 
-在线体验：[Cloudflare 计算器](https://hx-jan-calculator.hongxiang-jan777.workers.dev)。本次上线使用 Python Workers + 静态前端 + D1，参见 [Cloudflare 部署说明](cloudflare/README.md)。计算解析器和公式规则与本机版本共用，SQLite/PostgreSQL 运行方式继续保留。
+在线体验：[Cloudflare 计算器](https://calculator.hongxiang-jan777.workers.dev)。本次上线使用 Python Workers + 静态前端 + D1，参见 [Cloudflare 部署说明](cloudflare/README.md)。计算解析器和公式规则与本机版本共用，SQLite/PostgreSQL 运行方式继续保留。
 
 Python HTTP API for a front-end/back-end separated calculator. The backend validates and evaluates every expression, commits successful results to a database, and serves searchable, paginated history.
 
@@ -127,9 +127,9 @@ Tests use temporary SQLite databases. GitHub Actions also runs the persistence c
 
 ## Manual deployment
 
-Render: Python 3.13, build `pip install -r requirements.txt`, start `uvicorn app.main:app --host 0.0.0.0 --port $PORT`, health path `/api/health`. Set `DATABASE_URL` to Neon PostgreSQL and `ALLOWED_ORIGINS` to your frontend HTTPS origin. Do not use SQLite on Render's free ephemeral filesystem. The free service can sleep; allow for cold starts. No public deployment is included in this repository upload.
+当前公网版本使用 Cloudflare Python Workers、Static Assets 和 D1，部署步骤见 [cloudflare/README.md](cloudflare/README.md)。本机使用 SQLite，独立服务器可使用 PostgreSQL；线上 D1 与本机数据库分离。GitHub Actions 负责验证，发布更新仍需执行部署命令。
 
-See [Render FastAPI guide](https://render.com/docs/deploy-fastapi), [free service limitations](https://render.com/docs/free), and [code standards](codestyle.md).
+See [Cloudflare deployment](cloudflare/README.md) and [code standards](codestyle.md).
 
 
 ## Scientific mode and compatibility
