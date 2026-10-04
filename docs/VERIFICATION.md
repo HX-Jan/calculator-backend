@@ -1,6 +1,6 @@
 # 项目审查与测试报告
 
-核对日期：2026-10-04。当前入口：https://calculator.hongxiang-jan777.workers.dev。
+核对日期：2026-10-04。当前入口：https://calculator.assignment1.workers.dev。
 
 | 检查 | 结果 |
 |---|---|
