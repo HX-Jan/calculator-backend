@@ -6,6 +6,8 @@
 
 [在线体验](https://calculator.assignment1.workers.dev) · [前端仓库](https://github.com/HX-Jan/calculator-frontend) · [Cloudflare 部署](cloudflare/README.md)
 
+技术栈：Python 3.13、FastAPI、Pydantic、SQLAlchemy；本地 SQLite/独立服务器 PostgreSQL，Cloudflare 版本使用 Python Workers 与 D1。
+
 ## 项目信息
 
 负责人：[洪翔 / HX-Jan](https://github.com/HX-Jan)，负责需求规划、界面方案和功能迭代方向。[开发说明](docs/DEVELOPMENT.md)

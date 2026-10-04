@@ -6,6 +6,8 @@ A Python/FastAPI HTTP API for expression validation, safe evaluation, simplifica
 
 [Live site](https://calculator.assignment1.workers.dev) · [Frontend repository](https://github.com/HX-Jan/calculator-frontend) · [Cloudflare deployment (Chinese)](cloudflare/README.md)
 
+Stack: Python 3.13, FastAPI, Pydantic and SQLAlchemy; local SQLite or separate-server PostgreSQL, with Python Workers and D1 for Cloudflare.
+
 ## Project information
 
 Owner: [Hong Xiang / HX-Jan](https://github.com/HX-Jan), responsible for requirements, interface decisions and iteration priorities. [Development notes](docs/DEVELOPMENT.en.md)
